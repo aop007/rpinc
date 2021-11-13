@@ -1,0 +1,6 @@
+numpy
+matplotlib
+pyaudio
+python-sounddevice
+cuda-python
+pyqtgraph
