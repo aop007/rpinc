@@ -7,7 +7,7 @@ Demonstrates very basic use of ImageItem to display image data inside a ViewBox.
 
 from time import perf_counter
 
-import numpy as np
+import numpy
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 import scipy.ndimage.interpolation
@@ -15,7 +15,11 @@ import pyqtgraph.examples.initExample
 
 from rpinc.capture import MicrophoneRecorder
 
-mic = MicrophoneRecorder()
+CHUNKSIZE = 512
+POWER_MIN = -80
+POWER_MAX = 20
+
+mic = MicrophoneRecorder(rate=24000, chunksize=CHUNKSIZE)
 
 app = pg.mkQApp("ImageItem Example")
 
@@ -29,18 +33,21 @@ view = win.addViewBox()
 # view.setAspectLocked(True)
 
 ## Create image item
-img = pg.ImageItem(border='w')
+img = pg.ImageItem(border='w', autoLevels=False)
 view.addItem(img)
 
 ## Set initial view bounds
 
-BUFFER_DEPTH = 64
+BUFFER_DEPTH = 128
 
 ## Create random image
-data = np.zeros(shape=(BUFFER_DEPTH, mic.chunksize))
+
+BUFFER_WIDTH = int(CHUNKSIZE / 2 + 1)
+
+data = numpy.zeros(shape=(BUFFER_DEPTH, BUFFER_WIDTH))
 i = 0
 
-view.setRange(QtCore.QRectF(0, 0, BUFFER_DEPTH, mic.chunksize))
+view.setRange(QtCore.QRectF(0, 0, BUFFER_DEPTH, BUFFER_WIDTH))
 
 updateTime = perf_counter()
 elapsed = 0
@@ -58,10 +65,19 @@ def updateData():
     frames = mic.get_frames()
 
     if len(frames) > 0:
-        print(len(frames[0]), frames[0].min(), frames[0].max())
+        current_frame = frames[-1]
+        fft_frame = numpy.fft.rfft(current_frame / len(current_frame) ** 2)
 
+        # print(fft_frame.shape, current_frame.shape)
+
+        # Shift specthrograph
         data[1:, :] = data[0:-1, :]
-        data[0, :] = frames[0]
+        # data[0, :] = current_frame
+
+        log_fft = 20 * numpy.log10(numpy.abs(fft_frame))
+        log_fft = numpy.clip(log_fft, -80, 20)
+
+        data[0, :] = log_fft
 
         ## Display the data
         img.setImage(data)
