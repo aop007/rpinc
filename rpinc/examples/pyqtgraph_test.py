@@ -19,7 +19,7 @@ CHUNKSIZE = 512
 POWER_MIN = -80
 POWER_MAX = 20
 
-mic = MicrophoneRecorder(rate=24000, chunksize=CHUNKSIZE)
+mic = MicrophoneRecorder(rate=12000, chunksize=CHUNKSIZE)
 
 app = pg.mkQApp("ImageItem Example")
 
@@ -33,7 +33,7 @@ view = win.addViewBox()
 # view.setAspectLocked(True)
 
 ## Create image item
-img = pg.ImageItem(border='w', autoLevels=False)
+img = pg.ImageItem(border='w', autoLevels=True)
 view.addItem(img)
 
 ## Set initial view bounds
@@ -53,7 +53,7 @@ updateTime = perf_counter()
 elapsed = 0
 
 timer = QtCore.QTimer()
-timer.setSingleShot(True)
+# timer.setSingleShot(True)
 
 mic.start()
 
@@ -65,6 +65,10 @@ def updateData():
     frames = mic.get_frames()
 
     if len(frames) > 0:
+        if len(frames) > 1:
+            print(len(frames))
+        # end if
+
         current_frame = frames[-1]
         fft_frame = numpy.fft.rfft(current_frame / len(current_frame) ** 2)
 
@@ -74,26 +78,49 @@ def updateData():
         data[1:, :] = data[0:-1, :]
         # data[0, :] = current_frame
 
-        log_fft = 20 * numpy.log10(numpy.abs(fft_frame))
-        log_fft = numpy.clip(log_fft, -80, 20)
+        if True:
+            log_fft = 20 * numpy.log10(
+                numpy.clip(
+                    numpy.abs(fft_frame),
+                    1E-3,
+                    None
+                )
+            )
+            # log_fft = numpy.clip(log_fft, -80, 20)
 
-        data[0, :] = log_fft
+            # log_fft[numpy.isnan(log_fft)] = POWER_MIN
+
+            data[0, :] = log_fft
+        else:
+            log_fft = 20 * numpy.log10(
+                numpy.clip(
+                    numpy.abs(fft_frame),
+                    1,
+                    None
+                )
+            )
+            data[0, :] = log_fft
+        # end if
 
         ## Display the data
         img.setImage(data)
     # end if
 
-    timer.start(1)
-    now = perf_counter()
-    elapsed_now = now - updateTime
-    updateTime = now
-    elapsed = elapsed * 0.9 + elapsed_now * 0.1
+    if True:
+        timer.start(1)
+        now = perf_counter()
+        elapsed_now = now - updateTime
+        updateTime = now
+        elapsed = elapsed * 0.9 + elapsed_now * 0.1
+    # end if
 
         # print(f"{1 / elapsed:.1f} fps")
     # end if
+# end updateData()
 
 
 timer.timeout.connect(updateData)
+# timer.start(1000.0 / 60.0)
 updateData()
 
 if __name__ == '__main__':
